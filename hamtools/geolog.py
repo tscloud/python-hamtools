@@ -178,6 +178,7 @@ class Log(object):
             self.callsign = qso.get('station_callsign', None)
             if not self.callsign:
                 self.callsign = qso.get('operator', None)
+        		#self.callsign = 'KB1ZZV'
         return self
 
     def _georef(self, callsign):
@@ -206,11 +207,39 @@ class Log(object):
         except GeoRefFail:
             raise OperatorGeoRefFail("Failed to georeference operator callsign", self.callsign)
 
+    def oldfinishgeo(self, sess, ctydat):
         for qso in self.qsos:
+            #TC - here is what we set to go back to
+            qso['lat'], qso['lon'] = None, None
             try:
-                qso['lon'], qso['lat'] = self._georef(qso['call'])
-            except GeoRefFail:
-                log.warning("Failed to georef call %s", qso['call'])
+                rec = sess.qrz(qso['call'])
+                log.debug("qrz rec %s" % rec)
+                if rec['call'] != qso['call']:
+                    log.warning("qrz %s != %s" % (rec['call'], qso['call']))
+                if None in (rec['lat'], rec['lon']):
+                    raise NullLoc()
+                qso['lat'], qso['lon'] = rec['lat'], rec['lon']
+            except Exception, e:
+                if isinstance(e, qrz.NotFound):
+                    log.warning("QRZ lookup failed for %s, not found" % qso['call'])
+                elif isinstance(e, NullLoc):
+                    log.warning("QRZ lookup failed for %s, no location data" % qso['call'])
+                else:
+                    log.warning("QRZ lookup failed for %s" % qso['call'], exc_info=True)
+                try:
+                    dxcc = ctydat.getdxcc(qso['call'])
+                    qso['lat'] = float(dxcc['lat'])
+                    qso['lon'] = float(dxcc['lon']) * -1
+                except Exception:
+                    log.warning("cty.dat lookup failed for %s" % qso['call'], exc_info=True)
+                    #TC - Don't abend b/c we have exhausted all avenues
+                    # but need to figure out how to deal w/ "/" in callsign followed by number
+                    # this causes a None in lat/lon which will abend when dealing w/ them as float
+                    # in the klm file routine
+                    #--old---
+                    #raise
+                    #--new--
+                    #self.qsos.remove(qso)
 
     def geojson_dumps(self, *args, **kwargs):
         qth, pointsFC, linesFC = self.geojson()
@@ -259,7 +288,6 @@ class Log(object):
             folder.appendChild(callnode)
         dom.writepretty(file)
 
-
 def geolog(logfilepath, outfile, username, password, cachepath, ctydatflo):
     with open(logfilepath) as logfile:
         line = logfile.next()
@@ -276,15 +304,16 @@ def geolog(logfilepath, outfile, username, password, cachepath, ctydatflo):
     with qrz.Session(username, password, cachepath) as sess:
         qsolog.georeference(sess, ctydat)
 
-    points, lines = qsolog.geojson_dumps(sort_keys=True)
+    #TC - don't need to do geojson - I guess?
+    #points, lines = qsolog.geojson_dumps(sort_keys=True)
 
-    pointfile = '_'.join((outfile, 'points.geojson'))
-    with open(pointfile, "w") as pointfile:
-        pointfile.write(points)
+    #pointfile = '_'.join((outfile, 'points.geojson'))
+    #with open(pointfile, "w") as pointfile:
+    #    pointfile.write(points)
 
-    linefile = '_'.join((outfile, 'lines.geojson'))
-    with open(linefile, "w") as linefile:
-        linefile.write(lines)
+    #linefile = '_'.join((outfile, 'lines.geojson'))
+    #with open(linefile, "w") as linefile:
+    #    linefile.write(lines)
 
     kmlfile = ''.join((outfile, '.kml'))
     with open(kmlfile, "w") as kmlfile:

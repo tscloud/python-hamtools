@@ -268,7 +268,15 @@ class KML(object):
     elt = self.xml.createElement("coordinates")
     coo = ""
     for c in coords:
-      coo += "%f,%f,%f " % (c[1], c[0], c[2])
+    #TC - see what's going on
+      #print "coo:"
+      #print c[1]
+      #print c[0]
+      #print c[2]
+      try:
+        coo += "%f,%f,%f " % (c[1], c[0], c[2])
+      except:
+        raise  
     elt.appendChild(self.xml.createTextNode(coo))
     
     ls.appendChild(elt)
