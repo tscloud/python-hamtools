@@ -2,6 +2,6 @@
 ctydatpath=/home/tscloud/git/python-hamtools/hamtools/ctydat/cty.dat
 
 [qrz]
-username=kb1zzv
-password=p120741H
+username=username
+password=password
 cachepath=/tmp/qrz.db
